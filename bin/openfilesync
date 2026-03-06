@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# openfilesync - bidirectional file sync CLI
+
+set -euo pipefail
+
+# Resolve install location
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    REAL_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+else
+    REAL_PATH="${BASH_SOURCE[0]}"
+fi
+BIN_DIR="$(cd "$(dirname "$REAL_PATH")" && pwd)"
+LIB_DIR="${BIN_DIR}/../lib"
+
+source "${LIB_DIR}/core.sh"
+source "${LIB_DIR}/sync.sh"
+source "${LIB_DIR}/filters.sh"
+source "${LIB_DIR}/health.sh"
+
+VERSION="0.1.0"
+
+usage() {
+    cat <<EOF
+openfilesync v${VERSION} - bidirectional file sync
+
+Usage: openfilesync <command> [options]
+
+Commands:
+  init              Setup wizard (configure remote, folders, first sync)
+  sync              Run sync once
+  sync --dry-run    Preview sync without changes
+  sync --resync     Force full resync (after config changes)
+  status            Show sync status and health
+  conflicts         List conflict files
+  install-service   Install systemd timer
+  uninstall-service Remove systemd timer
+  log               Tail the sync log
+  version           Show version
+
+EOF
+}
+
+# --- Init wizard ---
+
+cmd_init() {
+    ensure_dirs
+    echo "OpenFileSync Setup"
+    echo "=================="
+    echo ""
+
+    # 1. SFTP connection
+    echo "-- Remote Storage (SFTP) --"
+    read -rp "Host (e.g. uXXXXXX.your-storagebox.de): " host
+    read -rp "Port [23]: " port
+    port="${port:-23}"
+    read -rp "Username: " user
+
+    echo "Auth method:"
+    echo "  1) Password"
+    echo "  2) SSH key"
+    read -rp "Choice [1]: " auth_choice
+    auth_choice="${auth_choice:-1}"
+
+    local remote_name="openfilesync"
+
+    # Remove existing rclone remote if present
+    rclone config delete "$remote_name" 2>/dev/null || true
+
+    if [[ "$auth_choice" == "2" ]]; then
+        read -rp "SSH key path [~/.ssh/id_rsa]: " key_path
+        key_path="${key_path:-${HOME}/.ssh/id_rsa}"
+        rclone config create "$remote_name" sftp \
+            host "$host" port "$port" user "$user" \
+            key_file "$key_path" \
+            shell_type none
+    else
+        read -rsp "Password: " password
+        echo ""
+        rclone config create "$remote_name" sftp \
+            host "$host" port "$port" user "$user" \
+            pass "$(rclone obscure "$password")" \
+            shell_type none
+    fi
+
+    echo ""
+    echo "Testing connection..."
+    if rclone lsd "${remote_name}:" >/dev/null 2>&1; then
+        echo "Connected successfully."
+    else
+        echo "Connection failed. Check your credentials and try again."
+        rclone config delete "$remote_name" 2>/dev/null || true
+        return 1
+    fi
+
+    REMOTE="$remote_name"
+    echo ""
+
+    # 2. Folder selection
+    echo "-- Folders to Sync --"
+    echo "Enter local paths to sync, one per line."
+    echo "Press Enter on empty line when done."
+    echo ""
+    echo "Examples:"
+    echo "  ${HOME}/Documents"
+    echo "  ${HOME}/Projects"
+    echo "  ${HOME}/.bashrc"
+    echo "  ${HOME}/.config/nvim"
+    echo ""
+
+    MAPPING_REMOTES=()
+    MAPPING_LOCALS=()
+
+    while true; do
+        read -rp "Path (or empty to finish): " local_path
+        [[ -z "$local_path" ]] && break
+
+        # Expand ~ to $HOME
+        local_path="${local_path/#\~/$HOME}"
+
+        if [[ ! -e "$local_path" ]]; then
+            echo "  Warning: path does not exist yet (will be created on first sync)"
+        fi
+
+        # Auto-generate remote path from local path
+        # Strip $HOME prefix and leading slashes
+        local remote_path
+        remote_path="${local_path#"$HOME"}"
+        remote_path="${remote_path#/}"
+
+        read -rp "  Remote path [${remote_path}]: " custom_remote
+        remote_path="${custom_remote:-$remote_path}"
+
+        MAPPING_REMOTES+=("$remote_path")
+        MAPPING_LOCALS+=("$local_path")
+        echo "  Added: ${local_path} <-> ${REMOTE}:${remote_path}"
+        echo ""
+    done
+
+    if [[ ${#MAPPING_REMOTES[@]} -eq 0 ]]; then
+        echo "No folders selected. Exiting."
+        return 1
+    fi
+
+    # 3. Save config and mappings
+    SYNC_INTERVAL="${DEFAULT_SYNC_INTERVAL}"
+    CONFLICT_RESOLVE="${DEFAULT_CONFLICT_RESOLVE}"
+    MAX_DELETE="${DEFAULT_MAX_DELETE}"
+    save_config
+    save_mappings
+    echo ""
+    echo "Config saved to ${CONFIG_FILE}"
+    echo "Mappings saved to ${MAPPINGS_FILE}"
+
+    # 4. Build filters (all presets enabled by default)
+    build_filters
+    echo ""
+
+    # 5. Dry run preview
+    echo "-- Preview (dry run) --"
+    echo ""
+    run_sync "true" "true"
+    echo ""
+
+    read -rp "Looks good? Run initial sync now? [Y/n]: " confirm
+    confirm="${confirm:-Y}"
+
+    if [[ "$confirm" =~ ^[Yy] ]]; then
+        echo ""
+        echo "Running initial sync (this may take a while for large folders)..."
+        run_sync "false" "true"
+        echo ""
+
+        # 6. Install systemd timer
+        read -rp "Install systemd timer (sync every 30 min)? [Y/n]: " install_timer
+        install_timer="${install_timer:-Y}"
+        if [[ "$install_timer" =~ ^[Yy] ]]; then
+            cmd_install_service
+        fi
+    else
+        echo ""
+        echo "Skipped. Run 'openfilesync sync --resync' when ready."
+    fi
+
+    echo ""
+    echo "Setup complete. Syncing ${#MAPPING_REMOTES[@]} folder(s) every 30 min."
+    echo "Run 'openfilesync status' anytime to check."
+}
+
+# --- Service management ---
+
+SYSTEMD_DIR="${HOME}/.config/systemd/user"
+
+cmd_install_service() {
+    mkdir -p "$SYSTEMD_DIR"
+
+    cat > "${SYSTEMD_DIR}/openfilesync-sync.service" << EOF
+[Unit]
+Description=OpenFileSync - bidirectional file sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$(command -v openfilesync || echo "${BIN_DIR}/openfilesync") sync
+StandardOutput=null
+StandardError=journal
+EOF
+
+    cat > "${SYSTEMD_DIR}/openfilesync-sync.timer" << EOF
+[Unit]
+Description=OpenFileSync - scheduled sync timer
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    systemctl --user daemon-reload
+    systemctl --user enable --now openfilesync-sync.timer
+
+    echo "Systemd timer installed and started."
+    echo "Check with: systemctl --user status openfilesync-sync.timer"
+}
+
+cmd_uninstall_service() {
+    systemctl --user disable --now openfilesync-sync.timer 2>/dev/null || true
+    rm -f "${SYSTEMD_DIR}/openfilesync-sync.service" "${SYSTEMD_DIR}/openfilesync-sync.timer"
+    systemctl --user daemon-reload
+    echo "Systemd timer removed."
+}
+
+# --- Log ---
+
+cmd_log() {
+    if [[ -f "$LOG_FILE" ]]; then
+        tail -f "$LOG_FILE"
+    else
+        echo "No log file yet. Run 'openfilesync sync' first."
+    fi
+}
+
+# --- Main dispatcher ---
+
+main() {
+    local cmd="${1:-}"
+    shift || true
+
+    case "$cmd" in
+        init)
+            cmd_init
+            ;;
+        sync)
+            local dry_run="false"
+            local resync="false"
+            for arg in "$@"; do
+                case "$arg" in
+                    --dry-run)  dry_run="true" ;;
+                    --resync)   resync="true" ;;
+                esac
+            done
+            ensure_dirs
+            trim_log
+            build_filters
+            run_sync "$dry_run" "$resync"
+            ;;
+        status)
+            show_status
+            ;;
+        conflicts)
+            list_conflicts
+            ;;
+        install-service)
+            cmd_install_service
+            ;;
+        uninstall-service)
+            cmd_uninstall_service
+            ;;
+        log)
+            cmd_log
+            ;;
+        version|--version|-v)
+            echo "openfilesync v${VERSION}"
+            ;;
+        help|--help|-h|"")
+            usage
+            ;;
+        *)
+            echo "Unknown command: $cmd"
+            echo ""
+            usage
+            return 1
+            ;;
+    esac
+}
+
+main "$@"

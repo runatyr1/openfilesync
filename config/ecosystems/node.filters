@@ -1,0 +1,20 @@
+# Node.js / NPM / React / Next.js / Expo
+- node_modules/**
+- .npm/**
+- npm-debug.log*
+- .eslintcache
+- .stylelintcache
+- .next/**
+- dist/**
+- build/**
+- out/**
+- .parcel-cache/**
+- .expo/**
+- .expo-shared/**
+- android/.gradle/**
+- android/build/**
+- android/app/build/**
+- ios/Pods/**
+- ios/build/**
+- ios/DerivedData/**
+- *.hbc

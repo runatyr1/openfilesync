@@ -1,0 +1,15 @@
+# OS-level excludes
+- .git/**
+- .cache/**
+- .local/share/Trash/**
+- .Trash-*/**
+- .DS_Store
+- Thumbs.db
+- *.swp
+- *.swo
+- *~
+- *.bak
+- *.tmp
+- *.log
+- logs/**
+- .idea/**

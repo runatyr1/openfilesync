@@ -1,0 +1,4 @@
+# Vim / Neovim
+- .vim/undodir/**
+- .local/share/nvim/swap/**
+- .local/state/nvim/**

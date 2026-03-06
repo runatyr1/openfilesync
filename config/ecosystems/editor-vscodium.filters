@@ -1,0 +1,15 @@
+# VSCodium / VS Code
+- .vscode-oss/**
+- .vscode/**
+- .config/VSCodium/CachedData/**
+- .config/VSCodium/CachedExtensions/**
+- .config/VSCodium/CachedExtensionVSIXs/**
+- .config/VSCodium/Code Cache/**
+- .config/VSCodium/Crashpad/**
+- .config/VSCodium/GPUCache/**
+- .config/VSCodium/Service Worker/**
+- .config/VSCodium/WebStorage/**
+- .config/VSCodium/logs/**
+- .config/VSCodium/Backups/**
+- .config/VSCodium/User/workspaceStorage/**
+- .config/VSCodium/User/globalStorage/**
