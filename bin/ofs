@@ -99,57 +99,127 @@ cmd_init() {
 
     # 2. Folder selection
     echo "-- Folders to Sync --"
-    echo "Enter paths one per line, or paste multiple at once."
-    echo "Press Enter on empty line when done."
-    echo ""
-    echo "Examples:"
-    echo "  ${HOME}/Documents"
-    echo "  ${HOME}/Projects"
-    echo "  ${HOME}/.bashrc"
-    echo "  ${HOME}/.config/nvim"
-    echo ""
+    echo "  1) Specify local folders to sync (first machine / new setup)"
+    echo "  2) Browse remote and pick existing folders (second machine / restore)"
+    echo "  3) Cancel"
+    read -rp "Choice [1]: " folder_mode
+    folder_mode="${folder_mode:-1}"
 
     MAPPING_REMOTES=()
     MAPPING_LOCALS=()
 
-    add_path() {
-        local local_path="$1"
+    if [[ "$folder_mode" == "3" ]]; then
+        echo "Cancelled."
+        return 0
+    elif [[ "$folder_mode" == "2" ]]; then
+        # Browse remote directories
+        echo ""
+        echo "Fetching remote directories..."
+        local remote_dirs
+        remote_dirs="$(rclone lsd "${remote_name}:" 2>/dev/null | awk '{print $NF}' || true)"
 
-        # Trim whitespace
-        local_path="$(echo "$local_path" | xargs)"
-        [[ -z "$local_path" ]] && return 1
-
-        # Expand ~ to $HOME
-        local_path="${local_path/#\~/$HOME}"
-
-        if [[ ! -e "$local_path" ]]; then
-            echo "  Warning: path does not exist yet (will be created on first sync)"
+        if [[ -z "$remote_dirs" ]]; then
+            echo "No directories found on remote. Use option 1 instead."
+            return 1
         fi
 
-        # Auto-generate remote path: strip $HOME prefix
-        local remote_path
-        remote_path="${local_path#"$HOME"}"
-        remote_path="${remote_path#/}"
-
-        MAPPING_REMOTES+=("$remote_path")
-        MAPPING_LOCALS+=("$local_path")
-        echo "  Added: ${local_path} <-> ${REMOTE}:${remote_path}"
-    }
-
-    while true; do
-        read -rp "Path (or empty to finish): " local_path
-        [[ -z "$local_path" ]] && break
-
-        add_path "$local_path"
-
-        # Drain any remaining lines from a pasted block
-        while read -r -t 0.1 extra_line; do
-            [[ -z "$extra_line" ]] && continue
-            add_path "$extra_line"
-        done
-
         echo ""
-    done
+        echo "Available remote directories:"
+        local dir_list=()
+        local idx=1
+        while IFS= read -r dir; do
+            dir_list+=("$dir")
+            echo "  ${idx}) ${dir}"
+            ((idx++))
+        done <<< "$remote_dirs"
+        echo "  a) Sync all"
+        echo ""
+
+        read -rp "Select directories (comma-separated numbers, or 'a' for all): " selection
+
+        local selected=()
+        if [[ "$selection" == "a" ]]; then
+            selected=("${dir_list[@]}")
+        else
+            IFS=',' read -ra picks <<< "$selection"
+            for pick in "${picks[@]}"; do
+                pick="$(echo "$pick" | xargs)"
+                if [[ "$pick" =~ ^[0-9]+$ ]] && (( pick >= 1 && pick <= ${#dir_list[@]} )); then
+                    selected+=("${dir_list[$((pick-1))]}")
+                else
+                    echo "  Skipping invalid selection: ${pick}"
+                fi
+            done
+        fi
+
+        if [[ ${#selected[@]} -eq 0 ]]; then
+            echo "No directories selected. Exiting."
+            return 1
+        fi
+
+        for remote_path in "${selected[@]}"; do
+            local local_path="${HOME}/${remote_path}"
+            echo "  Remote: ${remote_path} -> Local: ${local_path}"
+            read -rp "    Custom local path? [Enter to accept]: " custom_local
+            local_path="${custom_local:-$local_path}"
+            local_path="${local_path/#\~/$HOME}"
+
+            MAPPING_REMOTES+=("$remote_path")
+            MAPPING_LOCALS+=("$local_path")
+            echo "    Added: ${local_path} <-> ${REMOTE}:${remote_path}"
+        done
+    else
+        # Specify local folders
+        echo ""
+        echo "Enter paths one per line, or paste multiple at once."
+        echo "Press Enter on empty line when done."
+        echo ""
+        echo "Examples:"
+        echo "  ${HOME}/Documents"
+        echo "  ${HOME}/Projects"
+        echo "  ${HOME}/.bashrc"
+        echo "  ${HOME}/.config/nvim"
+        echo ""
+
+        add_path() {
+            local local_path="$1"
+
+            # Trim whitespace
+            local_path="$(echo "$local_path" | xargs)"
+            [[ -z "$local_path" ]] && return 1
+
+            # Expand ~ to $HOME
+            local_path="${local_path/#\~/$HOME}"
+
+            if [[ ! -e "$local_path" ]]; then
+                echo "  Warning: path does not exist yet (will be created on first sync)"
+            fi
+
+            # Auto-generate remote path: strip $HOME prefix
+            local remote_path
+            remote_path="${local_path#"$HOME"}"
+            remote_path="${remote_path#/}"
+
+            MAPPING_REMOTES+=("$remote_path")
+            MAPPING_LOCALS+=("$local_path")
+            echo "  Added: ${local_path} <-> ${REMOTE}:${remote_path}"
+        }
+
+        while true; do
+            read -rp "Path (or empty to finish): " local_path
+            [[ -z "$local_path" ]] && break
+
+            add_path "$local_path"
+
+            # Drain any remaining lines from a pasted block
+            while read -r -t 0.1 extra_line; do
+                [[ -z "$extra_line" ]] && continue
+                add_path "$extra_line"
+            done
+
+            echo ""
+        done
+    fi
 
     if [[ ${#MAPPING_REMOTES[@]} -eq 0 ]]; then
         echo "No folders selected. Exiting."
