@@ -33,6 +33,7 @@ Commands:
   status            Show sync status and health
   conflicts         List conflict files
   log               Tail the sync log
+  update            Update ofs to latest version
   install-service   Install systemd timer
   uninstall-service Remove systemd timer
   help              Show this help
@@ -98,7 +99,7 @@ cmd_init() {
 
     # 2. Folder selection
     echo "-- Folders to Sync --"
-    echo "Enter local paths to sync, one per line."
+    echo "Enter paths one per line, or paste multiple at once."
     echo "Press Enter on empty line when done."
     echo ""
     echo "Examples:"
@@ -111,9 +112,12 @@ cmd_init() {
     MAPPING_REMOTES=()
     MAPPING_LOCALS=()
 
-    while true; do
-        read -rp "Path (or empty to finish): " local_path
-        [[ -z "$local_path" ]] && break
+    add_path() {
+        local local_path="$1"
+
+        # Trim whitespace
+        local_path="$(echo "$local_path" | xargs)"
+        [[ -z "$local_path" ]] && return 1
 
         # Expand ~ to $HOME
         local_path="${local_path/#\~/$HOME}"
@@ -122,18 +126,28 @@ cmd_init() {
             echo "  Warning: path does not exist yet (will be created on first sync)"
         fi
 
-        # Auto-generate remote path from local path
-        # Strip $HOME prefix and leading slashes
+        # Auto-generate remote path: strip $HOME prefix
         local remote_path
         remote_path="${local_path#"$HOME"}"
         remote_path="${remote_path#/}"
 
-        read -rp "  Remote path [${remote_path}]: " custom_remote
-        remote_path="${custom_remote:-$remote_path}"
-
         MAPPING_REMOTES+=("$remote_path")
         MAPPING_LOCALS+=("$local_path")
         echo "  Added: ${local_path} <-> ${REMOTE}:${remote_path}"
+    }
+
+    while true; do
+        read -rp "Path (or empty to finish): " local_path
+        [[ -z "$local_path" ]] && break
+
+        add_path "$local_path"
+
+        # Drain any remaining lines from a pasted block
+        while read -r -t 0.1 extra_line; do
+            [[ -z "$extra_line" ]] && continue
+            add_path "$extra_line"
+        done
+
         echo ""
     done
 
@@ -234,14 +248,21 @@ cmd_uninstall_service() {
     echo "Systemd timer removed."
 }
 
-# --- Logs ---
+# --- Log ---
 
-cmd_logs() {
+cmd_log() {
     if [[ -f "$LOG_FILE" ]]; then
         tail -f "$LOG_FILE"
     else
         echo "No log file yet. Run 'ofs sync' first."
     fi
+}
+
+# --- Update ---
+
+cmd_update() {
+    echo "Updating OpenFileSync..."
+    curl -fsSL https://get.openfilesync.runatyr.dev/ | bash
 }
 
 # --- Main dispatcher ---
@@ -281,7 +302,10 @@ main() {
             cmd_uninstall_service
             ;;
         log)
-            cmd_logs
+            cmd_log
+            ;;
+        update)
+            cmd_update
             ;;
         version|--version|-v)
             echo "ofs v${VERSION} (OpenFileSync)"
