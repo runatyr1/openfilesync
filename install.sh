@@ -97,6 +97,11 @@ echo ""
 CONFIG_DIR="${HOME}/.config/openfilesync"
 if [[ -f "${CONFIG_DIR}/openfilesync.conf" ]]; then
     echo "-- Existing config detected, applying updates --"
+
+    # Clear stale lock files (ours + rclone's)
+    rm -f "${HOME}/.local/share/openfilesync/lock"
+    find "${HOME}/.cache/rclone/bisync/" -name '*.lck' -delete 2>/dev/null || true
+
     echo "Rebuilding filters..."
     "${BIN_LINK}" sync --resync 2>&1 || true
     echo ""
