@@ -7,6 +7,7 @@ set -euo pipefail
 REPO="https://github.com/runatyr1/openfilesync"
 INSTALL_DIR="/usr/local/share/openfilesync"
 BIN_LINK="/usr/local/bin/ofs"
+RCLONE_VERSION="1.73.1"
 
 echo "OpenFileSync Installer"
 echo "======================"
@@ -25,12 +26,32 @@ fi
 
 install_rclone() {
     if command -v rclone &>/dev/null; then
-        echo "rclone: already installed ($(rclone version --check 2>/dev/null || rclone version | head -1))"
-        return
+        local current
+        current="$(rclone version 2>/dev/null | head -1 | grep -oP 'v\K[0-9.]+')"
+        if [[ "$current" == "$RCLONE_VERSION" ]]; then
+            echo "rclone: already installed (v${current})"
+            return
+        fi
+        echo "rclone: upgrading v${current} -> v${RCLONE_VERSION}..."
+    else
+        echo "Installing rclone v${RCLONE_VERSION}..."
     fi
-    echo "Installing rclone..."
-    curl -fsSL https://rclone.org/install.sh | $SUDO bash
-    echo "rclone: installed"
+    local arch
+    arch="$(uname -m)"
+    case "$arch" in
+        x86_64)  arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        armv7l)  arch="arm-v7" ;;
+    esac
+    local tmpdir
+    tmpdir="$(mktemp -d)"
+    local url="https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${arch}.zip"
+    curl -fsSL "$url" -o "${tmpdir}/rclone.zip"
+    unzip -q "${tmpdir}/rclone.zip" -d "$tmpdir"
+    $SUDO cp "${tmpdir}/rclone-v${RCLONE_VERSION}-linux-${arch}/rclone" /usr/local/bin/rclone
+    $SUDO chmod +x /usr/local/bin/rclone
+    rm -rf "$tmpdir"
+    echo "rclone: installed v${RCLONE_VERSION}"
 }
 
 install_inotify_tools() {
