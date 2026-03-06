@@ -15,7 +15,8 @@ echo ""
 # Check for root (needed for /usr/local install)
 if [[ $EUID -ne 0 ]]; then
     SUDO="sudo"
-    echo "Will use sudo for installation to ${INSTALL_DIR}"
+    echo "Sudo required for installation to ${INSTALL_DIR}"
+    sudo -v || { echo "Sudo authentication failed."; exit 1; }
 else
     SUDO=""
 fi
