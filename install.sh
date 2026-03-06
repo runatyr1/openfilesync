@@ -92,9 +92,21 @@ echo "Installed to ${INSTALL_DIR}"
 echo "Binary linked at ${BIN_LINK}"
 echo ""
 
-# --- Done ---
+# --- Post-install: rebuild filters, resync, restart service (updates only) ---
 
-echo "Installation complete!"
-echo ""
-echo "Next step: run 'ofs init' to set up your sync."
+CONFIG_DIR="${HOME}/.config/openfilesync"
+if [[ -f "${CONFIG_DIR}/openfilesync.conf" ]]; then
+    echo "-- Existing config detected, applying updates --"
+    echo "Rebuilding filters..."
+    "${BIN_LINK}" sync --resync 2>&1 || true
+    echo ""
+    echo "Reinstalling service..."
+    "${BIN_LINK}" install-service 2>&1 || true
+    echo ""
+    echo "Update complete!"
+else
+    echo "Installation complete!"
+    echo ""
+    echo "Next step: run 'ofs init' to set up your sync."
+fi
 echo ""

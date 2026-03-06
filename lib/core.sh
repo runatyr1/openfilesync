@@ -102,7 +102,7 @@ load_mappings() {
     MAPPING_LOCALS=()
 
     if [[ ! -f "$MAPPINGS_FILE" ]]; then
-        log_error "No mappings found. Run 'openfilesync init' first."
+        log_error "No mappings found. Run 'ofs init' first."
         return 1
     fi
 
@@ -110,6 +110,9 @@ load_mappings() {
         remote_path="$(echo "$remote_path" | xargs)"
         local_path="$(echo "$local_path" | xargs)"
         [[ -z "$remote_path" || "$remote_path" == \#* ]] && continue
+        # Strip trailing slashes
+        remote_path="${remote_path%/}"
+        local_path="${local_path%/}"
         MAPPING_REMOTES+=("$remote_path")
         MAPPING_LOCALS+=("$local_path")
     done < "$MAPPINGS_FILE"
