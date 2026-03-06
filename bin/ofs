@@ -35,6 +35,7 @@ Commands:
   log               Tail the sync log
   update            Update ofs to latest version
   install-service   Install systemd timer
+  restart-service   Restart systemd timer
   uninstall-service Remove systemd timer
   help              Show this help
   version           Show version
@@ -311,6 +312,12 @@ EOF
     echo "Check with: systemctl --user status ofs-sync.timer"
 }
 
+cmd_restart_service() {
+    systemctl --user restart ofs-sync.timer
+    echo "Systemd timer restarted."
+    systemctl --user status ofs-sync.timer --no-pager
+}
+
 cmd_uninstall_service() {
     systemctl --user disable --now ofs-sync.timer 2>/dev/null || true
     rm -f "${SYSTEMD_DIR}/ofs-sync.service" "${SYSTEMD_DIR}/ofs-sync.timer"
@@ -367,6 +374,9 @@ main() {
             ;;
         install-service)
             cmd_install_service
+            ;;
+        restart-service)
+            cmd_restart_service
             ;;
         uninstall-service)
             cmd_uninstall_service

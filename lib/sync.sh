@@ -31,6 +31,18 @@ run_sync() {
             mkdir -p "$local_path"
         fi
 
+        # Ensure RCLONE_TEST check files exist on both sides
+        local check_file="RCLONE_TEST"
+        if [[ ! -f "${local_path}/${check_file}" ]]; then
+            touch "${local_path}/${check_file}"
+            log_info "Created check file: ${local_path}/${check_file}"
+        fi
+        # Create on remote if missing (ignore errors if it already exists)
+        if ! rclone lsf "${remote_full}/${check_file}" &>/dev/null; then
+            rclone touch "${remote_full}/${check_file}" 2>/dev/null || true
+            log_info "Created check file on remote: ${remote_full}/${check_file}"
+        fi
+
         log_info "Syncing: ${local_path} <-> ${remote_full}"
 
         local cmd=(
@@ -58,10 +70,24 @@ run_sync() {
             cmd+=(--dry-run)
         fi
 
-        if "${cmd[@]}" >> "$LOG_FILE" 2>&1; then
+        log_info "Command: ${cmd[*]}"
+
+        local output
+        if output="$("${cmd[@]}" 2>&1)"; then
+            echo "$output" >> "$LOG_FILE"
             log_info "Completed: ${local_path}"
         else
-            log_error "Failed: ${local_path}"
+            local exit_code=$?
+            echo "$output" >> "$LOG_FILE"
+            # Log the rclone error lines for quick diagnosis
+            local errors
+            errors="$(echo "$output" | grep -i 'ERROR\|NOTICE.*Failed\|fatal' | head -5)"
+            log_error "Failed: ${local_path} (exit code: ${exit_code})"
+            if [[ -n "$errors" ]]; then
+                while IFS= read -r line; do
+                    log_error "  ${line}"
+                done <<< "$errors"
+            fi
             ((failed++))
         fi
     done
