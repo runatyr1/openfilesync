@@ -329,6 +329,7 @@ cmd_restart_service() {
     log_info "Restarting sync..."
     systemctl --user stop ofs-sync.service 2>/dev/null || true
     systemctl --user restart ofs-sync.timer
+    systemctl --user start ofs-sync.service --no-block
     log_info "Sync restarted."
 }
 
