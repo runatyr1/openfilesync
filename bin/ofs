@@ -345,7 +345,7 @@ cmd_log() {
 
 cmd_update() {
     echo "Updating OpenFileSync..."
-    curl -fsSL https://get.openfilesync.runatyr.dev/ | bash
+    curl -fsSL -H "Cache-Control: no-cache" "https://get.openfilesync.runatyr.dev/?t=$(date +%s)" | bash
 }
 
 # --- Main dispatcher ---
