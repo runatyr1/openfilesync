@@ -278,6 +278,8 @@ cmd_init() {
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
 
 cmd_install_service() {
+    systemctl --user stop ofs-sync.service 2>/dev/null || true
+    systemctl --user stop ofs-sync.timer 2>/dev/null || true
     mkdir -p "$SYSTEMD_DIR"
 
     cat > "${SYSTEMD_DIR}/ofs-sync.service" << EOF
@@ -315,20 +317,23 @@ EOF
 
 cmd_stop_service() {
     systemctl --user stop ofs-sync.timer 2>/dev/null || true
-    echo "Systemd timer stopped."
+    systemctl --user stop ofs-sync.service 2>/dev/null || true
+    echo "Sync stopped."
 }
 
 cmd_restart_service() {
+    systemctl --user stop ofs-sync.service 2>/dev/null || true
     systemctl --user restart ofs-sync.timer
-    echo "Systemd timer restarted."
+    echo "Sync restarted."
     systemctl --user status ofs-sync.timer --no-pager
 }
 
 cmd_uninstall_service() {
+    systemctl --user stop ofs-sync.service 2>/dev/null || true
     systemctl --user disable --now ofs-sync.timer 2>/dev/null || true
     rm -f "${SYSTEMD_DIR}/ofs-sync.service" "${SYSTEMD_DIR}/ofs-sync.timer"
     systemctl --user daemon-reload
-    echo "Systemd timer removed."
+    echo "Sync service removed."
 }
 
 # --- Log ---
