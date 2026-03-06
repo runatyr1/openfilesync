@@ -303,7 +303,7 @@ Description=OpenFileSync - scheduled sync timer
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=30min
+OnUnitInactiveSec=30min
 RandomizedDelaySec=60
 
 [Install]
