@@ -4,9 +4,9 @@
 
 set -euo pipefail
 
-REPO="https://github.com/runatyr/openfilesync"
+REPO="https://github.com/runatyr1/openfilesync"
 INSTALL_DIR="/usr/local/share/openfilesync"
-BIN_LINK="/usr/local/bin/openfilesync"
+BIN_LINK="/usr/local/bin/ofs"
 
 echo "OpenFileSync Installer"
 echo "======================"
@@ -59,7 +59,7 @@ echo ""
 
 # --- Install openfilesync ---
 
-echo "-- Installing openfilesync --"
+echo "-- Installing OpenFileSync --"
 
 if [[ -d "$INSTALL_DIR" ]]; then
     echo "Updating existing installation..."
@@ -69,7 +69,6 @@ fi
 # Clone or download
 if command -v git &>/dev/null; then
     $SUDO git clone --depth 1 "$REPO" "$INSTALL_DIR" 2>/dev/null || {
-        # Fallback: download tarball
         echo "Git clone failed, trying tarball download..."
         tmpdir="$(mktemp -d)"
         curl -fsSL "${REPO}/archive/refs/heads/main.tar.gz" -o "${tmpdir}/openfilesync.tar.gz"
@@ -85,8 +84,8 @@ else
     rm -rf "$tmpdir"
 fi
 
-$SUDO chmod +x "${INSTALL_DIR}/bin/openfilesync"
-$SUDO ln -sf "${INSTALL_DIR}/bin/openfilesync" "$BIN_LINK"
+$SUDO chmod +x "${INSTALL_DIR}/bin/ofs"
+$SUDO ln -sf "${INSTALL_DIR}/bin/ofs" "$BIN_LINK"
 
 echo "Installed to ${INSTALL_DIR}"
 echo "Binary linked at ${BIN_LINK}"
@@ -96,5 +95,5 @@ echo ""
 
 echo "Installation complete!"
 echo ""
-echo "Next step: run 'openfilesync init' to set up your sync."
+echo "Next step: run 'ofs init' to set up your sync."
 echo ""

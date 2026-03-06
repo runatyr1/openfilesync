@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# openfilesync - bidirectional file sync CLI
+# ofs (OpenFileSync) - bidirectional file sync CLI
 
 set -euo pipefail
 
@@ -21,9 +21,9 @@ VERSION="0.1.0"
 
 usage() {
     cat <<EOF
-openfilesync v${VERSION} - bidirectional file sync
+ofs v${VERSION} - OpenFileSync - bidirectional file sync
 
-Usage: openfilesync <command> [options]
+Usage: ofs <command> [options]
 
 Commands:
   init              Setup wizard (configure remote, folders, first sync)
@@ -32,9 +32,10 @@ Commands:
   sync --resync     Force full resync (after config changes)
   status            Show sync status and health
   conflicts         List conflict files
+  log               Tail the sync log
   install-service   Install systemd timer
   uninstall-service Remove systemd timer
-  log               Tail the sync log
+  help              Show this help
   version           Show version
 
 EOF
@@ -178,12 +179,12 @@ cmd_init() {
         fi
     else
         echo ""
-        echo "Skipped. Run 'openfilesync sync --resync' when ready."
+        echo "Skipped. Run 'ofs sync --resync' when ready."
     fi
 
     echo ""
     echo "Setup complete. Syncing ${#MAPPING_REMOTES[@]} folder(s) every 30 min."
-    echo "Run 'openfilesync status' anytime to check."
+    echo "Run 'ofs status' anytime to check."
 }
 
 # --- Service management ---
@@ -193,7 +194,7 @@ SYSTEMD_DIR="${HOME}/.config/systemd/user"
 cmd_install_service() {
     mkdir -p "$SYSTEMD_DIR"
 
-    cat > "${SYSTEMD_DIR}/openfilesync-sync.service" << EOF
+    cat > "${SYSTEMD_DIR}/ofs-sync.service" << EOF
 [Unit]
 Description=OpenFileSync - bidirectional file sync
 After=network-online.target
@@ -201,12 +202,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=$(command -v openfilesync || echo "${BIN_DIR}/openfilesync") sync
+ExecStart=$(command -v ofs || echo "${BIN_DIR}/ofs") sync
 StandardOutput=null
 StandardError=journal
 EOF
 
-    cat > "${SYSTEMD_DIR}/openfilesync-sync.timer" << EOF
+    cat > "${SYSTEMD_DIR}/ofs-sync.timer" << EOF
 [Unit]
 Description=OpenFileSync - scheduled sync timer
 
@@ -220,26 +221,26 @@ WantedBy=timers.target
 EOF
 
     systemctl --user daemon-reload
-    systemctl --user enable --now openfilesync-sync.timer
+    systemctl --user enable --now ofs-sync.timer
 
     echo "Systemd timer installed and started."
-    echo "Check with: systemctl --user status openfilesync-sync.timer"
+    echo "Check with: systemctl --user status ofs-sync.timer"
 }
 
 cmd_uninstall_service() {
-    systemctl --user disable --now openfilesync-sync.timer 2>/dev/null || true
-    rm -f "${SYSTEMD_DIR}/openfilesync-sync.service" "${SYSTEMD_DIR}/openfilesync-sync.timer"
+    systemctl --user disable --now ofs-sync.timer 2>/dev/null || true
+    rm -f "${SYSTEMD_DIR}/ofs-sync.service" "${SYSTEMD_DIR}/ofs-sync.timer"
     systemctl --user daemon-reload
     echo "Systemd timer removed."
 }
 
-# --- Log ---
+# --- Logs ---
 
-cmd_log() {
+cmd_logs() {
     if [[ -f "$LOG_FILE" ]]; then
         tail -f "$LOG_FILE"
     else
-        echo "No log file yet. Run 'openfilesync sync' first."
+        echo "No log file yet. Run 'ofs sync' first."
     fi
 }
 
@@ -280,10 +281,10 @@ main() {
             cmd_uninstall_service
             ;;
         log)
-            cmd_log
+            cmd_logs
             ;;
         version|--version|-v)
-            echo "openfilesync v${VERSION}"
+            echo "ofs v${VERSION} (OpenFileSync)"
             ;;
         help|--help|-h|"")
             usage
