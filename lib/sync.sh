@@ -72,22 +72,12 @@ run_sync() {
 
         log_info "Command: ${cmd[*]}"
 
-        local output
-        if output="$("${cmd[@]}" 2>&1)"; then
-            echo "$output" >> "$LOG_FILE"
+        # Stream output to both screen and log file
+        if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE"; then
             log_info "Completed: ${local_path}"
         else
-            local exit_code=$?
-            echo "$output" >> "$LOG_FILE"
-            # Log the rclone error lines for quick diagnosis
-            local errors
-            errors="$(echo "$output" | grep -i 'ERROR\|NOTICE.*Failed\|fatal' | head -5)"
+            local exit_code=${PIPESTATUS[0]}
             log_error "Failed: ${local_path} (exit code: ${exit_code})"
-            if [[ -n "$errors" ]]; then
-                while IFS= read -r line; do
-                    log_error "  ${line}"
-                done <<< "$errors"
-            fi
             ((failed++))
         fi
     done
