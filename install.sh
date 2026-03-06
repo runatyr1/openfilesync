@@ -98,7 +98,7 @@ CONFIG_DIR="${HOME}/.config/openfilesync"
 if [[ -f "${CONFIG_DIR}/openfilesync.conf" ]]; then
     echo "-- Existing config detected, applying updates --"
 
-    # Stop service to prevent sync during update
+    # Stop service during update
     echo "Stopping service..."
     systemctl --user stop ofs-sync.timer 2>/dev/null || true
 
@@ -113,12 +113,19 @@ if [[ -f "${CONFIG_DIR}/openfilesync.conf" ]]; then
     find "${HOME}/.cache/rclone/bisync/" -name '*.lck' -delete 2>/dev/null || true
 
     echo "Rebuilding filters..."
-    "${BIN_LINK}" sync --resync 2>&1 || true
-    echo ""
+    source "${INSTALL_DIR}/lib/core.sh"
+    source "${INSTALL_DIR}/lib/filters.sh"
+    ensure_dirs
+    build_filters
+
     echo "Reinstalling service..."
     "${BIN_LINK}" install-service 2>&1 || true
+
+    # Trigger a sync in the background via systemd (not foreground)
+    echo "Triggering sync in background..."
+    systemctl --user start ofs-sync.service --no-block 2>/dev/null || true
     echo ""
-    echo "Update complete!"
+    echo "Update complete! Monitor sync with: ofs log"
 else
     echo "Installation complete!"
     echo ""
