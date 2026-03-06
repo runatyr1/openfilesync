@@ -137,14 +137,14 @@ save_mappings() {
 
 acquire_lock() {
     if [[ -f "$LOCK_FILE" ]]; then
-        local lock_age
-        lock_age=$(( $(date +%s) - $(stat -c %Y "$LOCK_FILE") ))
-        if [[ $lock_age -gt 120 ]]; then
-            log_warn "Stale lock file (${lock_age}s old), removing."
-            rm -f "$LOCK_FILE"
-        else
-            log_error "Another sync is running (lock age: ${lock_age}s). Exiting."
+        local lock_pid
+        lock_pid="$(cat "$LOCK_FILE" 2>/dev/null)"
+        if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
+            log_error "Another sync is running (pid: ${lock_pid}). Exiting."
             return 1
+        else
+            log_warn "Stale lock file (pid: ${lock_pid:-unknown} not running), removing."
+            rm -f "$LOCK_FILE"
         fi
     fi
     echo $$ > "$LOCK_FILE"
