@@ -27,8 +27,8 @@ run_sync() {
         local remote_full="${REMOTE}:${remote_path}"
 
         if [[ ! -e "$local_path" ]]; then
-            log_warn "Local path does not exist, skipping: ${local_path}"
-            continue
+            log_info "Local path does not exist, creating: ${local_path}"
+            mkdir -p "$local_path"
         fi
 
         log_info "Syncing: ${local_path} <-> ${remote_full}"
