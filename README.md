@@ -8,8 +8,23 @@ Sync your files across devices using cheap SFTP storage (Hetzner Storage Box, et
 
 ```bash
 curl -fsSL https://get.openfilesync.runatyr.dev/ | bash
+```
+
+This installs rclone (if missing), inotify-tools, and the `ofs` binary.
+
+Then run the setup wizard:
+
+```bash
 ofs init
 ```
+
+The wizard will ask you:
+1. SFTP host, port, username, and auth method (password or SSH key)
+2. Which local folders to sync (enter paths one by one)
+3. Confirm a dry-run preview, then run the initial sync
+4. Optionally install a systemd timer for automatic sync every 30 min
+
+Config is saved to `~/.config/openfilesync/`. Remote paths mirror your local structure by default (e.g. `~/Documents` → `Documents` on the remote).
 
 ## Usage
 
