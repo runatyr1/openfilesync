@@ -12,6 +12,7 @@
 - .expo/**
 - .expo-shared/**
 - android/.gradle/**
+- android/.cxx/**
 - android/build/**
 - android/app/build/**
 - ios/Pods/**
