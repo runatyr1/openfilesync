@@ -278,6 +278,8 @@ cmd_init() {
 SYSTEMD_DIR="${HOME}/.config/systemd/user"
 
 cmd_install_service() {
+    ensure_dirs
+    log_info "Installing sync service..."
     systemctl --user stop ofs-sync.service 2>/dev/null || true
     systemctl --user stop ofs-sync.timer 2>/dev/null || true
     mkdir -p "$SYSTEMD_DIR"
@@ -311,29 +313,33 @@ EOF
     systemctl --user daemon-reload
     systemctl --user enable --now ofs-sync.timer
 
-    echo "Systemd timer installed and started."
-    echo "Check with: systemctl --user status ofs-sync.timer"
+    log_info "Sync service installed and started."
 }
 
 cmd_stop_service() {
+    ensure_dirs
+    log_info "Stopping sync..."
     systemctl --user stop ofs-sync.timer 2>/dev/null || true
     systemctl --user stop ofs-sync.service 2>/dev/null || true
-    echo "Sync stopped."
+    log_info "Sync stopped."
 }
 
 cmd_restart_service() {
+    ensure_dirs
+    log_info "Restarting sync..."
     systemctl --user stop ofs-sync.service 2>/dev/null || true
     systemctl --user restart ofs-sync.timer
-    echo "Sync restarted."
-    systemctl --user status ofs-sync.timer --no-pager
+    log_info "Sync restarted."
 }
 
 cmd_uninstall_service() {
+    ensure_dirs
+    log_info "Uninstalling sync service..."
     systemctl --user stop ofs-sync.service 2>/dev/null || true
     systemctl --user disable --now ofs-sync.timer 2>/dev/null || true
     rm -f "${SYSTEMD_DIR}/ofs-sync.service" "${SYSTEMD_DIR}/ofs-sync.timer"
     systemctl --user daemon-reload
-    echo "Sync service removed."
+    log_info "Sync service removed."
 }
 
 # --- Log ---
@@ -349,7 +355,8 @@ cmd_log() {
 # --- Update ---
 
 cmd_update() {
-    echo "Updating OpenFileSync..."
+    ensure_dirs
+    log_info "Updating OpenFileSync..."
     curl -fsSL -H "Cache-Control: no-cache" "https://get.openfilesync.runatyr.dev/?t=$(date +%s)" | bash
 }
 
