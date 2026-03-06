@@ -345,8 +345,9 @@ cmd_uninstall_service() {
 # --- Log ---
 
 cmd_log() {
+    local lines="${1:-100}"
     if [[ -f "$LOG_FILE" ]]; then
-        tail -f "$LOG_FILE"
+        tail -n "$lines" -f "$LOG_FILE"
     else
         echo "No log file yet. Run 'ofs sync' first."
     fi
@@ -403,7 +404,7 @@ main() {
             cmd_uninstall_service
             ;;
         log)
-            cmd_log
+            cmd_log "$1"
             ;;
         update)
             cmd_update
