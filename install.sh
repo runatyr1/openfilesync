@@ -98,6 +98,16 @@ CONFIG_DIR="${HOME}/.config/openfilesync"
 if [[ -f "${CONFIG_DIR}/openfilesync.conf" ]]; then
     echo "-- Existing config detected, applying updates --"
 
+    # Stop service to prevent sync during update
+    echo "Stopping service..."
+    systemctl --user stop ofs-sync.timer 2>/dev/null || true
+
+    # Wait for any running sync to finish
+    while systemctl --user is-active ofs-sync.service &>/dev/null; do
+        echo "Waiting for running sync to finish..."
+        sleep 2
+    done
+
     # Clear stale lock files (ours + rclone's)
     rm -f "${HOME}/.local/share/openfilesync/lock"
     find "${HOME}/.cache/rclone/bisync/" -name '*.lck' -delete 2>/dev/null || true
