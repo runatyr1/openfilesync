@@ -77,9 +77,9 @@ run_sync() {
             log_info "Completed: ${local_path}"
         else
             local exit_code=${PIPESTATUS[0]}
-            # Auto-resync if filters hash changed
-            if grep -q "filters file md5 hash" "$LOG_FILE" 2>/dev/null && [[ "$resync" != "true" ]]; then
-                log_info "Filters changed, auto-running --resync for: ${local_path}"
+            # Auto-resync on recoverable errors (missing listings, filter changes, etc.)
+            if [[ "$resync" != "true" ]]; then
+                log_info "Sync failed, auto-running --resync for: ${local_path}"
                 cmd+=(--resync)
                 if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE"; then
                     log_info "Completed (resync): ${local_path}"
