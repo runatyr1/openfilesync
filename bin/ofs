@@ -405,7 +405,7 @@ main() {
             cmd_uninstall_service
             ;;
         log)
-            cmd_log "$1"
+            cmd_log "${1:-}"
             ;;
         update)
             cmd_update
