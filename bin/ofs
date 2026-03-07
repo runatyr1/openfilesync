@@ -30,6 +30,7 @@ Commands:
   sync              Run sync once
   sync --dry-run    Preview sync without changes
   sync --resync     Force full resync (after config changes)
+  sync --force      Allow bulk deletes (bypass max-delete safety)
   status            Show sync status and health
   conflicts         List conflict files
   log               Tail the sync log
@@ -375,16 +376,18 @@ main() {
         sync)
             local dry_run="false"
             local resync="false"
+            local force="false"
             for arg in "$@"; do
                 case "$arg" in
                     --dry-run)  dry_run="true" ;;
                     --resync)   resync="true" ;;
+                    --force)    force="true" ;;
                 esac
             done
             ensure_dirs
             trim_log
             build_filters
-            run_sync "$dry_run" "$resync"
+            run_sync "$dry_run" "$resync" "$force"
             ;;
         status)
             show_status

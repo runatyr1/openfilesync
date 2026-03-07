@@ -38,6 +38,7 @@ refresh_check_files() {
 run_sync() {
     local dry_run="${1:-false}"
     local resync="${2:-false}"
+    local force="${3:-false}"
 
     ensure_dirs
     trim_log
@@ -90,19 +91,28 @@ run_sync() {
             cmd+=(--dry-run)
         fi
 
+        if [[ "$force" == "true" ]]; then
+            cmd+=(--force)
+        fi
+
         log_info "Command: ${cmd[*]}"
 
-        # Stream output to both screen and log file
-        if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE"; then
+        # Stream output to both screen and log file, capture for error detection
+        local sync_output
+        sync_output="$(mktemp)"
+        if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE" "$sync_output"; then
             log_info "Completed: ${local_path}"
         else
             local exit_code=${PIPESTATUS[0]}
-            # Auto-resync on failure (missing listings, filter changes, etc.)
-            if [[ "$resync" != "true" ]]; then
+            # Don't auto-resync on max-delete safety abort — that would restore deleted files
+            if grep -q "too many deletes" "$sync_output" 2>/dev/null; then
+                log_error "Too many deletes for: ${local_path}. Run 'ofs sync --force' to allow."
+            elif [[ "$resync" != "true" ]]; then
                 log_info "Sync failed (exit code: ${exit_code}), retrying with --resync for: ${local_path}"
                 cmd+=(--resync)
                 if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE"; then
                     log_info "Completed (resync): ${local_path}"
+                    rm -f "$sync_output"
                     continue
                 fi
                 exit_code=${PIPESTATUS[0]}
@@ -110,6 +120,7 @@ run_sync() {
             log_error "Failed: ${local_path} (exit code: ${exit_code})"
             ((failed++))
         fi
+        rm -f "$sync_output"
     done
 
     if [[ $failed -gt 0 ]]; then
