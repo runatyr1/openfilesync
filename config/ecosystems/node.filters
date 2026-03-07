@@ -5,17 +5,20 @@
 - .eslintcache
 - .stylelintcache
 - .next/**
-- dist/**
-- build/**
-- out/**
 - .parcel-cache/**
 - .expo/**
 - .expo-shared/**
-- android/.gradle/**
-- android/.cxx/**
+- .turbo/**
+- .nuxt/**
+- .output/**
+- *.hbc
+# Android (React Native / Expo)
+- .gradle/**
+- .cxx/**
+- CMakeFiles/**
 - android/build/**
 - android/app/build/**
+# iOS (React Native / Expo)
 - ios/Pods/**
 - ios/build/**
 - ios/DerivedData/**
-- *.hbc

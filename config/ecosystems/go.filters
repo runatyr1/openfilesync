@@ -1,3 +1,2 @@
 # Go
-- vendor/**
-- bin/**
+- go/pkg/**
