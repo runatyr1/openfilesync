@@ -75,7 +75,6 @@ run_sync() {
             --compare size,modtime
             --max-delete "$MAX_DELETE"
             --check-access
-            --create-empty-src-dirs
             -v
         )
 
@@ -101,6 +100,9 @@ run_sync() {
         local sync_output
         sync_output="$(mktemp)"
         if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE" "$sync_output"; then
+            # Clean up empty directories on both sides
+            rclone rmdirs "${remote_full}" --leave-root -v 2>&1 | tee -a "$LOG_FILE"
+            find "$local_path" -mindepth 1 -type d -empty -delete 2>&1 | tee -a "$LOG_FILE"
             log_info "Completed: ${local_path}"
         else
             local exit_code=${PIPESTATUS[0]}
