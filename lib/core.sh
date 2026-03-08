@@ -53,7 +53,7 @@ trim_log() {
             next
         }
         { print }
-    ' "$LOG_FILE" > "$tmp" && mv "$tmp" "$LOG_FILE"
+    ' "$LOG_FILE" > "$tmp" && cat "$tmp" > "$LOG_FILE" && rm -f "$tmp"
 }
 
 # --- Config ---
