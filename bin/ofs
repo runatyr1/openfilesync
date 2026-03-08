@@ -326,11 +326,18 @@ cmd_stop() {
     log_info "Stopping all sync processes..."
     systemctl --user stop ofs-sync.timer 2>/dev/null || true
     systemctl --user stop ofs-sync.service 2>/dev/null || true
-    # Kill any manual ofs sync processes (but not this stop command)
+    # Kill any manual ofs sync / rclone bisync processes (but not this stop command)
     local my_pid=$$
-    pgrep -f "ofs sync" 2>/dev/null | while read -r pid; do
-        [[ "$pid" != "$my_pid" ]] && kill "$pid" 2>/dev/null || true
-    done
+    local pids
+    pids="$(pgrep -f "ofs sync|rclone bisync" 2>/dev/null || true)"
+    if [[ -n "$pids" ]]; then
+        while read -r pid; do
+            if [[ "$pid" != "$my_pid" ]]; then
+                kill -- -"$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')" 2>/dev/null || kill "$pid" 2>/dev/null || true
+                log_info "Killed process $pid"
+            fi
+        done <<< "$pids"
+    fi
     # Clear lock
     rm -f "${DATA_DIR}/lock"
     log_info "All sync processes stopped."
