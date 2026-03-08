@@ -33,7 +33,10 @@ Commands:
   sync --force      Allow bulk deletes (bypass max-delete safety)
   status            Show sync status and health
   conflicts         List conflict files
-  log               Tail the sync log
+  log               Tail the sync log (default 100 lines)
+  log <N>            Tail last N lines
+  log purge          Clear the log file
+  log rotate         Rotate log (current -> .log.1 -> .log.2 ...)
   update            Update ofs to latest version
   install-service   Install systemd timer
   stop-service      Stop systemd timer
@@ -347,12 +350,42 @@ cmd_uninstall_service() {
 # --- Log ---
 
 cmd_log() {
-    local lines="${1:-100}"
-    if [[ -f "$LOG_FILE" ]]; then
-        tail -n "$lines" -F "$LOG_FILE"
-    else
-        echo "No log file yet. Run 'ofs sync' first."
-    fi
+    local subcmd="${1:-}"
+    case "$subcmd" in
+        purge)
+            ensure_dirs
+            > "$LOG_FILE"
+            log_info "Log purged."
+            ;;
+        rotate)
+            ensure_dirs
+            if [[ -f "$LOG_FILE" ]]; then
+                # Shift existing rotated logs
+                local i=9
+                while [[ $i -gt 0 ]]; do
+                    local prev=$((i - 1))
+                    local src="${LOG_FILE}.${prev}"
+                    [[ "$prev" -eq 0 ]] && src="$LOG_FILE"
+                    if [[ -f "$src" ]]; then
+                        mv "$src" "${LOG_FILE}.${i}"
+                    fi
+                    ((i--))
+                done
+                > "$LOG_FILE"
+                log_info "Log rotated."
+            else
+                echo "No log file yet. Run 'ofs sync' first."
+            fi
+            ;;
+        *)
+            local lines="${subcmd:-100}"
+            if [[ -f "$LOG_FILE" ]]; then
+                tail -n "$lines" -F "$LOG_FILE"
+            else
+                echo "No log file yet. Run 'ofs sync' first."
+            fi
+            ;;
+    esac
 }
 
 # --- Update ---
