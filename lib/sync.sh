@@ -6,6 +6,32 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/core.sh"
 
+cleanup_empty_dirs() {
+    local local_path="$1"
+    local remote_full="$2"
+
+    log_info "Cleaning empty directories..."
+
+    # Remote
+    local remote_output
+    remote_output="$(rclone rmdirs "${remote_full}" --leave-root -v 2>&1)"
+    if [[ -n "$remote_output" ]]; then
+        echo "$remote_output" | tee -a "$LOG_FILE"
+    else
+        log_info "No empty remote directories to clean."
+    fi
+
+    # Local
+    local local_output
+    local_output="$(find "$local_path" -mindepth 1 -type d -empty -delete -print 2>&1)"
+    if [[ -n "$local_output" ]]; then
+        echo "$local_output" | tee -a "$LOG_FILE"
+        log_info "Cleaned local empty directories."
+    else
+        log_info "No empty local directories to clean."
+    fi
+}
+
 refresh_check_files() {
     local check_file="RCLONE_TEST"
     local cache_dir="${HOME}/.cache/rclone/bisync"
@@ -100,9 +126,7 @@ run_sync() {
         local sync_output
         sync_output="$(mktemp)"
         if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE" "$sync_output"; then
-            # Clean up empty directories on both sides
-            rclone rmdirs "${remote_full}" --leave-root -v 2>&1 | tee -a "$LOG_FILE"
-            find "$local_path" -mindepth 1 -type d -empty -delete 2>&1 | tee -a "$LOG_FILE"
+            cleanup_empty_dirs "$local_path" "$remote_full"
             log_info "Completed: ${local_path}"
         else
             local exit_code=${PIPESTATUS[0]}
@@ -113,6 +137,7 @@ run_sync() {
                 log_info "Sync failed (exit code: ${exit_code}), retrying with --resync for: ${local_path}"
                 cmd+=(--resync)
                 if "${cmd[@]}" 2>&1 | tee -a "$LOG_FILE"; then
+                    cleanup_empty_dirs "$local_path" "$remote_full"
                     log_info "Completed (resync): ${local_path}"
                     rm -f "$sync_output"
                     continue

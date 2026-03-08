@@ -37,11 +37,12 @@ Commands:
   log <N>            Tail last N lines
   log purge          Clear the log file
   log rotate         Rotate log (current -> .log.1 -> .log.2 ...)
+  stop              Stop all sync processes (service, timer, manual)
   update            Update ofs to latest version
   install-service   Install systemd timer
-  stop-service      Stop systemd timer
-  restart-service   Restart systemd timer
-  uninstall-service Remove systemd timer
+  stop-service      Stop all sync processes (alias for stop)
+  restart-service   Restart systemd timer and trigger sync
+  uninstall-service Remove systemd timer and service
   help              Show this help
   version           Show version
 
@@ -320,12 +321,23 @@ EOF
     log_info "Sync service installed and started."
 }
 
-cmd_stop_service() {
+cmd_stop() {
     ensure_dirs
-    log_info "Stopping sync..."
+    log_info "Stopping all sync processes..."
     systemctl --user stop ofs-sync.timer 2>/dev/null || true
     systemctl --user stop ofs-sync.service 2>/dev/null || true
-    log_info "Sync stopped."
+    # Kill any manual ofs sync processes (but not this stop command)
+    local my_pid=$$
+    pgrep -f "ofs sync" 2>/dev/null | while read -r pid; do
+        [[ "$pid" != "$my_pid" ]] && kill "$pid" 2>/dev/null || true
+    done
+    # Clear lock
+    rm -f "${DATA_DIR}/lock"
+    log_info "All sync processes stopped."
+}
+
+cmd_stop_service() {
+    cmd_stop
 }
 
 cmd_restart_service() {
@@ -430,6 +442,9 @@ main() {
             ;;
         install-service)
             cmd_install_service
+            ;;
+        stop)
+            cmd_stop
             ;;
         stop-service)
             cmd_stop_service
