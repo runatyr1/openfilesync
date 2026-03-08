@@ -21,9 +21,18 @@ cleanup_empty_dirs() {
         log_info "No empty remote directories to clean."
     fi
 
-    # Local
+    # Local (skip filtered directories — they're not synced, their structure must be preserved)
     local local_output
-    local_output="$(find "$local_path" -mindepth 1 -type d -empty -delete -print 2>&1)"
+    local_output="$(find "$local_path" -mindepth 1 \
+        -not -path '*/.git/*' -not -name '.git' \
+        -not -path '*/node_modules/*' -not -name 'node_modules' \
+        -not -path '*/.gradle/*' -not -name '.gradle' \
+        -not -path '*/.cache/*' -not -name '.cache' \
+        -not -path '*/.cxx/*' -not -name '.cxx' \
+        -not -path '*/CMakeFiles/*' -not -name 'CMakeFiles' \
+        -not -path '*/.idea/*' -not -name '.idea' \
+        -not -path '*/ios/Pods/*' \
+        -type d -empty -delete -print 2>&1)"
     if [[ -n "$local_output" ]]; then
         echo "$local_output" | tee -a "$LOG_FILE"
         log_info "Cleaned local empty directories."
