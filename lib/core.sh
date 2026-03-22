@@ -48,8 +48,8 @@ trim_log() {
     cutoff="$(date -d '15 days ago' '+%Y-%m-%d')"
     local tmp="${LOG_FILE}.tmp"
     awk -v cutoff="$cutoff" '
-        match($0, /^\[([0-9]{4}-[0-9]{2}-[0-9]{2})/, m) {
-            if (m[1] >= cutoff) print
+        /^\[[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+            if (substr($0, 2, 10) >= cutoff) print
             next
         }
         { print }
