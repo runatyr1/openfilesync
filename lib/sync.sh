@@ -159,6 +159,7 @@ run_sync() {
         rm -f "$sync_output"
     done
 
+    release_lock
     if [[ $failed -gt 0 ]]; then
         log_error "Sync finished with ${failed}/${total} failures."
         return 1
