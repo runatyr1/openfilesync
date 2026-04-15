@@ -11,6 +11,53 @@ PRESETS_DIR="${SCRIPT_DIR}/../config/ecosystems"
 # User custom filters
 CUSTOM_FILTERS="${CONFIG_DIR}/filters.custom"
 
+emit_custom_filters() {
+    [[ -f "$CUSTOM_FILTERS" ]] || return 0
+
+    if [[ -f "$MAPPINGS_FILE" ]]; then
+        load_mappings
+    else
+        MAPPING_LOCALS=()
+    fi
+
+    local line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        case "$line" in
+            ""|\#*)
+                echo "$line"
+                ;;
+            [+-]' '*)
+                echo "$line"
+                ;;
+            /*)
+                emit_absolute_path_filter "$line"
+                ;;
+            *)
+                log_warn "Skipping unsupported custom filter rule: ${line}"
+                ;;
+        esac
+    done < "$CUSTOM_FILTERS"
+}
+
+emit_absolute_path_filter() {
+    local path="${1%/}"
+
+    for local_root in "${MAPPING_LOCALS[@]:-}"; do
+        local_root="${local_root%/}"
+        if [[ "$path" == "$local_root" || "$path" == "$local_root/"* ]]; then
+            local rel="${path#"$local_root"/}"
+            if [[ -z "$rel" || "$rel" == "$path" ]]; then
+                log_warn "Skipping custom filter for mapping root: ${1}"
+                return 0
+            fi
+            echo "- /${rel}/**"
+            return 0
+        fi
+    done
+
+    log_warn "Skipping custom filter outside mapped paths: ${1}"
+}
+
 build_filters() {
     ensure_dirs
 
@@ -34,7 +81,7 @@ build_filters() {
         # Append user custom filters if present
         if [[ -f "$CUSTOM_FILTERS" ]]; then
             echo "# --- custom ---"
-            cat "$CUSTOM_FILTERS"
+            emit_custom_filters
             echo ""
         fi
     } > "$tmp"
